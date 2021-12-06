@@ -1,0 +1,64 @@
+﻿using FlixOne.InventoryManagement.UserInterface;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using FlixOne.InventoryManagement.Repository;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FlixOne.InventoryManagement.Command
+{
+    public abstract class InventoryCommand
+    {
+        private readonly bool _isTerminatingCommand;
+        protected readonly IUserInterface userInterface;
+        internal InventoryCommand(bool commandIsTerminating, IUserInterface userInterface)
+        {
+            _isTerminatingCommand = commandIsTerminating;
+            this.userInterface = userInterface;
+        }
+        public (bool wasSuccessful, bool shouldQuit) RunCommand()
+        {
+            if (this is IParameterisedCommand parameterisedCommand)
+            {
+                var allParametersCompleted = false;
+                while (allParametersCompleted == false)
+                {
+                    allParametersCompleted = parameterisedCommand.GetParameters();
+                }
+            }
+
+            return (InternalCommand(), _isTerminatingCommand);
+        }
+        protected abstract bool InternalCommand();
+
+        protected string GetParameter(string parameterName)
+        {
+            return userInterface.ReadValue($"Enter {parameterName}:");
+        }
+
+        public static Func<IServiceProvider, Func<string, InventoryCommand>> GetInventoryCommand => provider => input =>
+        {
+            switch (input.ToLower())
+            {
+                case "q":
+                case "quit":
+                    return new QuitCommand(provider.GetService<IUserInterface>());
+                case "a":
+                case "addinventory":
+                    return new AddInventoryCommand(provider.GetService<IUserInterface>(), provider.GetService<IInventoryWriteContext>());
+                case "g":
+                case "getinventory":
+                    return new GetInventoryCommand(provider.GetService<IUserInterface>(), provider.GetService<IInventoryReadContext>());
+                case "u":
+                case "updatequantity":
+                    return new UpdateQuantityCommand(provider.GetService<IUserInterface>(), provider.GetService<IInventoryWriteContext>());
+                case "?":
+                    return new HelpCommand(provider.GetService<IUserInterface>());
+                default:
+                    return new UnknownCommand(provider.GetService<IUserInterface>());
+            }
+        };
+    }
+}
